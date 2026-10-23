@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amazon Warehouse | High-Selling Analytics Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBase: '#080C14',
+                        darkCard: '#111827',
+                        darkBorder: '#1F2937',
+                        amazonAmber: '#F59E0B',
+                        amazonBlue: '#2563EB',
+                        cyberCyan: '#06B6D4'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="min-h-screen">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            
+            <!-- Brand -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black">
+                    <i data-lucide="package-search" class="w-6 h-6 text-slate-950"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-extrabold text-lg tracking-tight text-white">AMAZON WAREHOUSE</span>
+                        <span class="text-xs uppercase px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">DARK STORE</span>
+                    </div>
+                    <div class="flex items-center space-x-2 text-xs text-slate-400">
+                        <span class="live-indicator"></span>
+                        <span id="activeDatasetLabel">Loading Dataset...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center space-x-3">
+                <button onclick="clearDashboardData()" id="clearDataBtn" title="Reset to Clean Zero State" class="hidden flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-slate-700/60 hover:border-rose-500/40 text-xs font-semibold transition-all">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                    <span>Reset to 0</span>
+                </button>
+
+                <button onclick="openUploadModal()" class="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-md shadow-blue-500/25">
+                    <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                    <span>Upload Raw Data</span>
+                </button>
+
+
+                <button onclick="toggleFullscreen()" id="fullscreenBtn" title="Warehouse TV / Fullscreen Display" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all">
+                    <i data-lucide="maximize" class="w-4 h-4"></i>
+                </button>
+
+                <button onclick="toggleTheme()" id="themeBtn" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all">
+                    <i data-lucide="sun" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Time Horizon Control Bar (All Time | 1 Month | 7 Days | D-1) -->
+        <section class="glass-panel p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
+            
+            <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2 hidden sm:inline">Time Horizon:</span>
+                
+                <button onclick="setTimeFilter('d_minus_1')" id="btn-d_minus_1" class="time-pill flex items-center space-x-2">
+                    <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span>D-1 (Yesterday)</span>
+                </button>
+
+                <button onclick="setTimeFilter('days_7')" id="btn-days_7" class="time-pill flex items-center space-x-2">
+                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    <span>Last 7 Days</span>
+                </button>
+
+                <button onclick="setTimeFilter('month_1')" id="btn-month_1" class="time-pill flex items-center space-x-2">
+                    <i data-lucide="calendar-range" class="w-3.5 h-3.5 text-indigo-400"></i>
+                    <span>Last 1 Month (30D)</span>
+                </button>
+
+                <button onclick="setTimeFilter('all_time')" id="btn-all_time" class="time-pill active flex items-center space-x-2">
+                    <i data-lucide="globe" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    <span>All Time</span>
+                </button>
+
+                <button onclick="toggleCustomDateModal()" id="btn-custom" class="time-pill flex items-center space-x-2">
+                    <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+                    <span>Custom</span>
+                </button>
+            </div>
+
+            <!-- Filters Toggle & Date Range Indicator -->
+            <div class="flex items-center space-x-3 w-full lg:w-auto justify-between lg:justify-end">
+                <div id="dateRangeIndicator" class="text-xs font-mono text-slate-400 px-3 py-1.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                    Range: Calculating...
+                </div>
+
+                <div class="flex items-center space-x-2 bg-slate-950/60 border border-slate-800 p-1 rounded-xl">
+                    <button onclick="setStatusFilter('delivered_only')" id="status-delivered" class="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-600/30 text-emerald-400 border border-emerald-500/30">
+                        Net Delivered
+                    </button>
+                    <button onclick="setStatusFilter('all')" id="status-all" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200">
+                        All Orders
+                    </button>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Custom Date Range Bar (Hidden by default) -->
+        <section id="customDateBar" class="glass-panel p-4 hidden flex-wrap items-center gap-4 bg-slate-900/60">
+            <div class="flex items-center space-x-2">
+                <label class="text-xs font-semibold text-slate-400">From:</label>
+                <input type="date" id="customStartDate" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
+            </div>
+            <div class="flex items-center space-x-2">
+                <label class="text-xs font-semibold text-slate-400">To:</label>
+                <input type="date" id="customEndDate" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
+            </div>
+            <button onclick="applyCustomDate()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-1.5 rounded-lg">
+                Apply Custom Range
+            </button>
+        </section>
+
+        <!-- Executive KPI Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- Card 1: Units Dispatched -->
+            <div class="glass-panel p-5 relative overflow-hidden group">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Units Dispatched</span>
+                    <div class="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                        <i data-lucide="boxes" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-baseline space-x-2">
+                    <h3 id="kpiUnits" class="text-3xl font-extrabold text-white font-mono tracking-tight">0</h3>
+                    <span class="text-xs font-semibold text-blue-400">Units</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center space-x-1">
+                    <span>High Selling Inventory Volume</span>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+            </div>
+
+            <!-- Card 2: Total Revenue GMV / Total Orders -->
+            <div class="glass-panel p-5 relative overflow-hidden group">
+                <div class="flex items-center justify-between">
+                    <span id="kpiCard2Title" class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Revenue (GMV)</span>
+                    <div id="kpiCard2Icon" class="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                        <i data-lucide="indian-rupee" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-baseline space-x-2">
+                    <h3 id="kpiRevenue" class="text-3xl font-extrabold text-emerald-400 font-mono tracking-tight">₹ 0</h3>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center space-x-1">
+                    <span id="kpiRevenueHuman" class="font-semibold text-slate-300">₹ 0 Lakhs</span>
+                    <span id="kpiRevenueSub">gross merchandise value</span>
+                </div>
+                <div id="kpiCard2Bar" class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+            </div>
+
+            <!-- Card 3: Total Orders & AOV / Basket Size -->
+            <div class="glass-panel p-5 relative overflow-hidden group">
+                <div class="flex items-center justify-between">
+                    <span id="kpiCard3Title" class="text-xs font-bold uppercase tracking-wider text-slate-400">Orders & Basket Size</span>
+                    <div class="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 border border-amber-500/20">
+                        <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-baseline space-x-2">
+                    <h3 id="kpiOrders" class="text-3xl font-extrabold text-white font-mono tracking-tight">0</h3>
+                    <span id="kpiOrdersUnit" class="text-xs font-semibold text-amber-400">Orders</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center space-x-2">
+                    <span id="kpiCard3Sub">AOV: <strong id="kpiAov" class="text-amber-400 font-mono">₹ 0</strong></span>
+                    <span>•</span>
+                    <span>SKUs: <strong id="kpiSkus" class="text-slate-200 font-mono">0</strong></span>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500"></div>
+            </div>
+
+            <!-- Card 4: Cancellation / Returns -->
+            <div class="glass-panel p-5 relative overflow-hidden group">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Order Health & Returns</span>
+                    <div class="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 border border-rose-500/20">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-baseline space-x-2">
+                    <h3 id="kpiCancelRate" class="text-3xl font-extrabold text-rose-400 font-mono tracking-tight">0%</h3>
+                    <span class="text-xs font-semibold text-slate-400">Cancel/Return</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center space-x-1">
+                    <span id="kpiHealthBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400">Excellent Fulfillment</span>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-pink-500"></div>
+            </div>
+
+        </section>
+
+        <!-- Executive Best-Seller Impact & Timeline Intelligence Card -->
+        <section class="glass-panel p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 border-amber-500/30 relative overflow-hidden">
+            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+                
+                <!-- Left: #1 Best Seller Highlight with Percentages -->
+                <div class="flex items-start space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-2xl shadow-lg shadow-amber-500/10 flex-shrink-0">
+                        👑
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-[11px] uppercase tracking-wider font-extrabold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/30">
+                                #1 Highest-Selling Product in Analyzed Period
+                            </span>
+                            <span id="aiInsightTimelineBadge" class="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
+                                Analyzed Duration: Calculating...
+                            </span>
+                        </div>
+                        <h3 id="aiInsightTopProductTitle" class="text-base sm:text-lg font-extrabold text-white mt-1.5 leading-snug">
+                            Loading Top Seller...
+                        </h3>
+                        <p id="aiInsightDescription" class="text-xs text-slate-300 mt-1">
+                            Sold <strong id="aiInsightUnits" class="text-white font-mono">0</strong> units — contributing <strong id="aiInsightVolumePct" class="text-blue-400 font-mono font-bold">0%</strong> of your entire store's volume and <strong id="aiInsightRevPct" class="text-emerald-400 font-mono font-bold">0%</strong> of gross revenue.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Right: Top 5 Concentration & Analyzed Days Summary -->
+                <div class="flex items-center space-x-6 w-full lg:w-auto border-t lg:border-t-0 lg:border-l border-slate-800 pt-3 lg:pt-0 lg:pl-6 justify-between lg:justify-end">
+                    <div>
+                        <span class="text-[11px] uppercase tracking-wider font-bold text-slate-400">Top 5 Products Share</span>
+                        <div class="text-2xl font-black text-amber-400 font-mono mt-0.5" id="aiTop5Share">0%</div>
+                        <span class="text-[10px] text-slate-400">of total store volume</span>
+                    </div>
+                    <div class="h-10 w-px bg-slate-800"></div>
+                    <div>
+                        <span class="text-[11px] uppercase tracking-wider font-bold text-slate-400">Period Duration</span>
+                        <div class="text-2xl font-black text-cyan-400 font-mono mt-0.5" id="aiAnalyzedDays">0 Days</div>
+                        <span class="text-[10px] text-slate-400">store operation window</span>
+                    </div>
+                </div>
+
+            </div>
+            <div class="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
+        </section>
+
+        <!-- Charts Row: Executive Visual Intelligence -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Chart 1: Top 10 High Selling Horizontal Bar Chart (with % and actual data) -->
+            <div class="glass-panel p-5 lg:col-span-1">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+                        <h4 class="font-bold text-sm text-white">Top 10 High-Sellers (% Share)</h4>
+                    </div>
+                    <span id="topBarMetricLabel" class="text-xs font-semibold text-amber-400">By Units Sold (%)</span>
+                </div>
+                <div class="h-80 relative">
+                    <canvas id="topProductsBarChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Trendline (Daily / Hourly) -->
+            <div class="glass-panel p-5 lg:col-span-1">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                        <h4 id="trendChartTitle" class="font-bold text-sm text-white">Dispatch Velocity Trend (% & Volume)</h4>
+                    </div>
+                    <div class="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                        <button onclick="setChartMetric('units')" id="btn-chart-units" class="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-600 text-white">Units</button>
+                        <button onclick="setChartMetric('revenue')" id="btn-chart-revenue" class="px-2 py-0.5 text-xs font-bold rounded-md text-slate-400 hover:text-white">Revenue (₹)</button>
+                    </div>
+                </div>
+                <div class="h-80 relative">
+                    <canvas id="salesTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 3: Category Share Donut -->
+            <div class="glass-panel p-5 lg:col-span-1">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                        <h4 class="font-bold text-sm text-white">Category Share (% & GMV)</h4>
+                    </div>
+                    <span class="text-xs text-slate-400">Volume & Value</span>
+                </div>
+                <div class="h-80 relative flex items-center justify-center">
+                    <canvas id="categoryDonutChart"></canvas>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- High-Selling Products Leaderboard (The Core Table) -->
+        <section class="glass-panel p-6 space-y-4">
+            
+            <!-- Report Mode Clarification Banner -->
+            <div id="reportModeBanner" class="hidden px-4 py-3 rounded-xl bg-slate-950/80 border border-blue-500/30 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-sm">
+                <div class="flex items-center space-x-2.5 text-blue-300">
+                    <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                    <span id="reportModeText" class="font-medium">Report Mode: Amazon WMS Outbound Dispatch Audit (Displaying real picked units, customer order counts & basket density)</span>
+                </div>
+                <span id="reportModeNote" class="text-[11px] text-slate-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">ℹ️ WMS logs track bins & volume, not prices</span>
+            </div>
+
+            <!-- Table Header Controls -->
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center space-x-3 w-full md:w-auto">
+                    <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                        <i data-lucide="flame" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-lg text-white">High-Selling Products Leaderboard</h3>
+                        <p class="text-xs text-slate-400">Ranked by actual warehouse dispatch volume, GMV, and percentage contribution</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+                    <!-- Search Input -->
+                    <div class="relative w-full sm:w-56">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                        <input type="text" id="searchInput" placeholder="Search ASIN, SKU, Title..." oninput="handleSearch(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                    </div>
+
+                    <!-- Category Filter -->
+                    <select id="categorySelect" onchange="handleCategoryFilter(this.value)" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="all">All Categories</option>
+                    </select>
+
+                    <!-- Sort By -->
+                    <select id="sortBySelect" onchange="handleSortChange(this.value)" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="units">Sort by: Units Sold 🔥</option>
+                        <option id="sortByRevOption" value="revenue">Sort by: Revenue ₹</option>
+                    </select>
+
+                    <!-- Multi-Format Export Dropdown -->
+                    <div class="relative inline-block text-left">
+                        <button onclick="toggleExportMenu()" id="exportDropdownBtn" class="flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/20">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            <span>Download Report</span>
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div id="exportMenu" class="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-2xl bg-slate-900 border border-slate-700 ring-1 ring-black ring-opacity-5 divide-y divide-slate-800 z-50 hidden">
+                            <div class="py-1">
+                                <a href="javascript:void(0)" onclick="exportData('excel')" class="group flex items-center px-4 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-emerald-400">
+                                    <i data-lucide="file-spreadsheet" class="w-4 h-4 mr-2.5 text-emerald-400"></i>
+                                    Download Excel (.xlsx)
+                                </a>
+                                <a href="javascript:void(0)" onclick="exportData('pdf')" class="group flex items-center px-4 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-rose-400">
+                                    <i data-lucide="file-text" class="w-4 h-4 mr-2.5 text-rose-400"></i>
+                                    Download PDF Report (.pdf)
+                                </a>
+                                <a href="javascript:void(0)" onclick="exportData('csv')" class="group flex items-center px-4 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-blue-400">
+                                    <i data-lucide="file-code" class="w-4 h-4 mr-2.5 text-blue-400"></i>
+                                    Download Raw CSV (.csv)
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="overflow-x-auto border border-slate-800 rounded-xl bg-slate-900/40">
+                <table class="w-full min-w-[1240px] text-left text-xs border-collapse">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-bold text-[11px] tracking-wider border-b border-slate-800">
+                        <tr>
+                            <th class="py-3.5 px-3 w-14 text-center whitespace-nowrap">Rank</th>
+                            <th class="py-3.5 px-4 min-w-[320px] whitespace-nowrap">Product Details (ASIN / SKU / Title)</th>
+                            <th class="py-3.5 px-4 min-w-[160px] text-center whitespace-nowrap">Category</th>
+                            <th id="thUnitsHeader" class="py-3.5 px-4 min-w-[140px] text-right whitespace-nowrap">Units Sold (% Share)</th>
+                            <th id="thRevenueHeader" class="py-3.5 px-4 min-w-[150px] text-right whitespace-nowrap">Total GMV (₹) (% Share)</th>
+                            <th id="thPriceHeader" class="py-3.5 px-3 min-w-[120px] text-center whitespace-nowrap">Avg Price</th>
+                            <th class="py-3.5 px-4 min-w-[220px] text-center whitespace-nowrap">Velocity (Run-Rate)</th>
+                            <th class="py-3.5 px-3 min-w-[110px] text-center whitespace-nowrap">Pareto (80/20)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topSellingTableBody" class="divide-y divide-slate-800/60 font-sans">
+                        <!-- Populated by dashboard.js -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Footer -->
+            <div class="flex items-center justify-between text-xs text-slate-400 pt-2">
+                <div id="tableRecordCount">Showing 0 high-selling products</div>
+                <div class="flex items-center space-x-2">
+                    <span>Rows:</span>
+                    <select id="limitSelect" onchange="handleLimitChange(this.value)" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="250">250</option>
+                    </select>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel bg-slate-900 border-slate-700 max-w-lg w-full p-6 space-y-4">
+            
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                        <i data-lucide="file-up" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="font-bold text-base text-white">Upload Amazon Raw Data</h3>
+                </div>
+                <button onclick="closeUploadModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-300">
+                Upload your raw export from Amazon Seller Central, FBA Fulfillment, or WMS. Supports <strong>CSV, XLSX, TSV, TXT</strong> files with up to millions of records.
+            </p>
+
+            <!-- Dropzone -->
+            <div id="dropzone" onclick="triggerFileInput()" class="border-2 border-dashed border-slate-700 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-500 transition-all bg-slate-950/50">
+                <input type="file" id="fileInput" class="hidden" accept=".csv,.xlsx,.xls,.tsv,.txt,.parquet" onchange="handleFileSelect(event)">
+                <div class="flex flex-col items-center space-y-2">
+                    <i data-lucide="upload-cloud" class="w-10 h-10 text-blue-400"></i>
+                    <span class="text-sm font-semibold text-white">Click to browse or Drag & Drop here</span>
+                    <span class="text-xs text-slate-500">Supports files up to 1GB+ (Processed in seconds via DuckDB)</span>
+                </div>
+            </div>
+
+            <!-- Upload Progress Bar -->
+            <div id="uploadProgressContainer" class="hidden space-y-2">
+                <div class="flex justify-between text-xs font-semibold">
+                    <span id="uploadStatusText" class="text-blue-400">Processing raw data with DuckDB...</span>
+                    <span id="uploadPercent" class="text-slate-400">0%</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div id="uploadProgressBar" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeUploadModal()" class="px-4 py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-white bg-slate-800">Cancel</button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Product Quick Peek Modal -->
+    <div id="productDetailModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel bg-slate-900 border-slate-700 max-w-xl w-full p-6 space-y-5">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span id="modalProductCategory" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">Category</span>
+                        <span id="modalProductPareto" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Top 80% Driver</span>
+                    </div>
+                    <h3 id="modalProductTitle" class="text-base font-extrabold text-white mt-1.5 leading-snug">Product Title</h3>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <span id="modalProductAsin" class="font-mono text-xs text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 cursor-pointer" onclick="copyModalAsin()" title="Click to copy ASIN">ASIN: ...</span>
+                        <span id="modalProductSku" class="font-mono text-xs text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">SKU: ...</span>
+                    </div>
+                </div>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- 4 Performance Metric Cards -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                    <span class="text-[10px] font-bold uppercase text-slate-400">Total Units Sold</span>
+                    <div id="modalProductUnits" class="text-xl font-extrabold text-white font-mono mt-0.5">0</div>
+                    <span id="modalProductUnitsShare" class="text-[11px] font-semibold text-blue-400">0% of total volume</span>
+                </div>
+                <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                    <span id="modalRevLabel" class="text-[10px] font-bold uppercase text-slate-400">Total Turnover (GMV)</span>
+                    <div id="modalProductRevenue" class="text-xl font-extrabold text-emerald-400 font-mono mt-0.5">₹ 0</div>
+                    <span id="modalProductRevShare" class="text-[11px] font-semibold text-emerald-300">0% of store GMV</span>
+                </div>
+                <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                    <span id="modalPriceLabel" class="text-[10px] font-bold uppercase text-slate-400">Average Unit Price</span>
+                    <div id="modalProductPrice" class="text-xl font-extrabold text-white font-mono mt-0.5">₹ 0</div>
+                    <span id="modalPriceSub" class="text-[10px] text-slate-400">per order unit</span>
+                </div>
+                <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                    <span class="text-[10px] font-bold uppercase text-slate-400">Daily Selling Speed</span>
+                    <div id="modalProductVelocity" class="text-xl font-extrabold text-amber-400 font-mono mt-0.5">0 /day</div>
+                    <span id="modalProductConsistency" class="text-[10px] text-slate-400">Active in 0 days</span>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center pt-2 border-t border-slate-800 text-xs text-slate-400">
+                <span>Warehouse Rank: <strong id="modalProductRank" class="text-white font-mono">#1</strong></span>
+                <button onclick="closeProductModal()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 space-y-2"></div>
+
+    <!-- Dashboard JavaScript Logic -->
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Temporary User Uploads & Samples (keeps git repo small and under Vercel limits)
+uploads/
+sample_amazon_orders_50k.csv
+
+# OS generated files
+.DS_Store
+Thumbs.db
